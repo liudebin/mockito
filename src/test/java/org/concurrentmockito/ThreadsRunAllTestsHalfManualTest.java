@@ -14,7 +14,7 @@ import org.mockito.exceptions.base.MockitoAssertionErrorTest;
 import org.mockito.exceptions.base.MockitoExceptionTest;
 import org.mockito.internal.AllInvocationsFinderTest;
 import org.mockito.internal.InvalidStateDetectionTest;
-import org.mockito.internal.creation.bytebuddy.CachingMockBytecodeGeneratorTest;
+import org.mockito.internal.creation.bytebuddy.TypeCachingMockBytecodeGeneratorTest;
 import org.mockito.internal.handler.MockHandlerImplTest;
 import org.mockito.internal.invocation.InvocationImplTest;
 import org.mockito.internal.invocation.InvocationMatcherTest;
@@ -78,7 +78,7 @@ public class ThreadsRunAllTestsHalfManualTest extends TestBase {
                     MissingInvocationCheckerTest.class,
                     NumberOfInvocationsInOrderCheckerTest.class,
                     MissingInvocationInOrderCheckerTest.class,
-                    CachingMockBytecodeGeneratorTest.class,
+                    TypeCachingMockBytecodeGeneratorTest.class,
                     InvocationMatcherTest.class,
                     InvocationsFinderTest.class,
                     InvocationImplTest.class,
