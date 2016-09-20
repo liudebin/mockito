@@ -5,7 +5,6 @@ import org.junit.Test;
 import org.mockito.Mockito;
 import org.mockito.internal.InternalMockHandler;
 import org.mockito.internal.creation.MockSettingsImpl;
-import org.mockito.internal.creation.bytebuddy.MockMethodInterceptor.MockAccess;
 import org.mockito.internal.stubbing.InvocationContainer;
 import org.mockito.invocation.Invocation;
 import org.mockito.invocation.MockHandler;
@@ -21,9 +20,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.fail;
 import static org.mockitoutil.ClassLoaders.coverageTool;
 
-public class ByteBuddyMockMakerTest {
+public abstract class AbstractByteBuddyMockMakerTest {
 
-    MockMaker mockMaker = new ByteBuddyMockMaker();
+    protected final MockMaker mockMaker;
+
+    public AbstractByteBuddyMockMakerTest(MockMaker mockMaker) {
+        this.mockMaker = mockMaker;
+    }
+
+    protected abstract Class<?> mockTypeOf(Class<?> type);
 
     @Test
     public void should_create_mock_from_interface() throws Exception {
@@ -38,7 +43,7 @@ public class ByteBuddyMockMakerTest {
     public void should_create_mock_from_class() throws Exception {
         ClassWithoutConstructor proxy = mockMaker.createMock(settingsFor(ClassWithoutConstructor.class), dummyH());
 
-        Class<?> superClass = proxy.getClass().getSuperclass();
+        Class<?> superClass = mockTypeOf(proxy.getClass());
         assertThat(superClass).isEqualTo(ClassWithoutConstructor.class);
     }
 
@@ -58,12 +63,11 @@ public class ByteBuddyMockMakerTest {
         SomeClass mockOne = mockMaker.createMock(settingsFor(SomeClass.class), dummyH());
         SomeClass mockTwo = mockMaker.createMock(settingsFor(SomeClass.class), dummyH());
 
-        MockAccess interceptorOne = (MockAccess) mockOne;
-        MockAccess interceptorTwo = (MockAccess) mockTwo;
+        MockHandler handlerOne = mockMaker.getHandler(mockOne);
+        MockHandler handlerTwo = mockMaker.getHandler(mockTwo);
 
 
-        assertThat(interceptorOne.getMockitoInterceptor())
-                .isNotSameAs(interceptorTwo.getMockitoInterceptor());
+        assertThat(handlerOne).isNotSameAs(handlerTwo);
     }
 
     @Test
@@ -100,7 +104,7 @@ public class ByteBuddyMockMakerTest {
                 .build();
 
         Class<?> mock_maker_class_loaded_fine_until = Class.forName(
-                "org.mockito.internal.creation.bytebuddy.ByteBuddyMockMaker",
+                "org.mockito.internal.creation.bytebuddy.SubclassByteBuddyMockMaker",
                 true,
                 classpath_with_objenesis
         );

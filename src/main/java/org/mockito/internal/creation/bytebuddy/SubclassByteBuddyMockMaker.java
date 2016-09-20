@@ -3,7 +3,6 @@ package org.mockito.internal.creation.bytebuddy;
 import org.mockito.exceptions.base.MockitoException;
 import org.mockito.internal.InternalMockHandler;
 import org.mockito.internal.configuration.plugins.Plugins;
-import org.mockito.internal.creation.bytebuddy.MockMethodInterceptor.MockAccess;
 import org.mockito.internal.creation.instance.Instantiator;
 import org.mockito.invocation.MockHandler;
 import org.mockito.mock.MockCreationSettings;
@@ -11,20 +10,21 @@ import org.mockito.mock.SerializableMode;
 import org.mockito.plugins.MockMaker;
 
 import java.lang.reflect.Modifier;
+import java.util.Set;
 
 import static org.mockito.internal.util.StringJoiner.join;
 
-public class ByteBuddyMockMaker implements MockMaker {
+public class SubclassByteBuddyMockMaker implements MockMaker {
 
-    private final CachingMockBytecodeGenerator cachingMockBytecodeGenerator;
+    private final BytecodeGenerator cachingMockBytecodeGenerator;
 
-    public ByteBuddyMockMaker() {
-        cachingMockBytecodeGenerator = new CachingMockBytecodeGenerator(false);
+    public SubclassByteBuddyMockMaker() {
+        cachingMockBytecodeGenerator = new TypeCachingBytecodeGenerator(new SubclassBytecodeGenerator(), false);
     }
 
     @Override
     public <T> T createMock(MockCreationSettings<T> settings, MockHandler handler) {
-        Class<T> mockedProxyType = createProxyClass(mockWithFeaturesFrom(settings));
+        Class<? extends T> mockedProxyType = createProxyClass(mockWithFeaturesFrom(settings));
 
         Instantiator instantiator = Plugins.getInstantiatorProvider().getInstantiator(settings);
         T mockInstance = null;
@@ -44,26 +44,30 @@ public class ByteBuddyMockMaker implements MockMaker {
                     "",
                     "You might experience classloading issues, please ask the mockito mailing-list.",
                     ""
-            ),cce);
+            ), cce);
         } catch (org.mockito.internal.creation.instance.InstantiationException e) {
             throw new MockitoException("Unable to create mock instance of type '" + mockedProxyType.getSuperclass().getSimpleName() + "'", e);
         }
     }
 
-    <T> Class<T> createProxyClass(MockFeatures<T> mockFeatures) {
-        return cachingMockBytecodeGenerator.get(mockFeatures);
+    @Override
+    public <T> Class<? extends T> createMockType(Class<T> mockedType, Set<Class<?>> interfaces, SerializableMode serializableMode) {
+        return cachingMockBytecodeGenerator.mockClass(MockFeatures.withMockFeatures(mockedType, interfaces, serializableMode));
     }
 
+    <T> Class<? extends T> createProxyClass(MockFeatures<T> mockFeatures) {
+        return cachingMockBytecodeGenerator.mockClass(mockFeatures);
+    }
 
-    private <T> MockFeatures<T> mockWithFeaturesFrom(MockCreationSettings<T> settings) {
+    private static <T> MockFeatures<T> mockWithFeaturesFrom(MockCreationSettings<T> settings) {
         return MockFeatures.withMockFeatures(
                 settings.getTypeToMock(),
                 settings.getExtraInterfaces(),
-                settings.getSerializableMode() == SerializableMode.ACROSS_CLASSLOADERS
+                settings.getSerializableMode()
         );
     }
 
-    private <T> T ensureMockIsAssignableToMockedType(MockCreationSettings<T> settings, T mock) {
+    private static <T> T ensureMockIsAssignableToMockedType(MockCreationSettings<T> settings, T mock) {
         // Force explicit cast to mocked type here, instead of
         // relying on the JVM to implicitly cast on the client call site.
         // This allows us to catch earlier the ClassCastException earlier
@@ -88,6 +92,19 @@ public class ByteBuddyMockMaker implements MockMaker {
     }
 
     @Override
+    public Class<?> getMockedType(Object mock) {
+        if (getHandler(mock) == null) {
+            return null;
+        }
+        MockedType mockedType = mock.getClass().getAnnotation(MockedType.class);
+        if (mockedType == null) {
+            return mock.getClass();
+        } else {
+            return mockedType.type();
+        }
+    }
+
+    @Override
     public void resetMock(Object mock, MockHandler newHandler, MockCreationSettings settings) {
         ((MockAccess) mock).setMockitoInterceptor(
                 new MockMethodInterceptor(asInternalMockHandler(newHandler), settings)
@@ -105,10 +122,10 @@ public class ByteBuddyMockMaker implements MockMaker {
             @Override
             public String nonMockableReason() {
                 //TODO SF does not seem to have test coverage. What is the expected value when type mockable
-                if(type.isPrimitive()) {
+                if (type.isPrimitive()) {
                     return "primitive type";
                 }
-                if(Modifier.isFinal(type.getModifiers())) {
+                if (Modifier.isFinal(type.getModifiers())) {
                     return "final or anonymous class";
                 }
                 return join("not handled type");
@@ -126,5 +143,4 @@ public class ByteBuddyMockMaker implements MockMaker {
         }
         return (InternalMockHandler<?>) handler;
     }
-
 }

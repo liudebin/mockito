@@ -6,13 +6,23 @@ import org.mockito.plugins.PluginSwitch;
 import java.io.IOException;
 import java.net.URL;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
 
 class PluginLoader {
 
     private final PluginSwitch pluginSwitch;
 
+    private final Map<String, String> alias;
+
     public PluginLoader(PluginSwitch pluginSwitch) {
         this.pluginSwitch = pluginSwitch;
+        this.alias = new HashMap<String, String>();
+    }
+
+    PluginLoader withAlias(String name, String type) {
+        alias.put(name, type);
+        return this;
     }
 
     /**
@@ -55,6 +65,10 @@ class PluginLoader {
         try {
             String foundPluginClass = new PluginFinder(pluginSwitch).findPluginClass(Iterables.toIterable(resources));
             if (foundPluginClass != null) {
+                String aliasType = alias.get("inline");
+                if (aliasType != null) {
+                    foundPluginClass = aliasType;
+                }
                 Class<?> pluginClass = loader.loadClass(foundPluginClass);
                 Object plugin = pluginClass.newInstance();
                 return service.cast(plugin);
